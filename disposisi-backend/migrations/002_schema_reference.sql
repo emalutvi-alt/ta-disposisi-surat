@@ -1,0 +1,4 @@
+-- Reference schema: import full database from disposisi-rpl1/disposisi-sekolah.sql
+-- This backend expects PostgreSQL tables: users, jabatan, user_jabatan, otp,
+-- surat_masuk, surat_keluar, disposisi, distribusi_sm, distribusi_sk,
+-- notifikasi, log, log_distribusi.

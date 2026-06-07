@@ -1,0 +1,10 @@
+*.exe
+*.log
+*.env
+bin/
+vendor/
+.env
+.env.*
+!.env.example
+*.exe
+*.exe~

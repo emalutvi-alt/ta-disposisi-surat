@@ -1,0 +1,1117 @@
+﻿openapi: 3.1.0
+
+info:
+  title: Disposisi Surat Sekolah API
+  version: 1.0.0
+  description: |
+    REST API untuk sistem manajemen disposisi surat masuk dan surat keluar sekolah.
+
+    ## Autentikasi
+    Semua endpoint (kecuali `/api/auth/login`, `/api/auth/forgot-password`, `/api/auth/resend-otp`,
+    `/api/auth/verify-otp`, dan `/api/auth/reset-password`) membutuhkan **Bearer Token** di header:
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    ## Roles
+    | Role | Keterangan |
+    |------|-----------|
+    | `kepsek` | Kepala Sekolah – membuat & approve disposisi |
+    | `tu` / `admin` | Tata Usaha – input & verifikasi surat |
+    | `users` / `pegawai` | Pegawai / Penerima disposisi |
+
+    ## Format Respons
+    Semua endpoint mengembalikan envelope JSON:
+    ```json
+    { "success": true, "message": "...", "data": { ... } }
+    ```
+
+    ## Akun Dummy (seed)
+    | Email | Password | Role |
+    |-------|----------|------|
+    | dummy_kepsek@gmail.com | Admin1234 | kepsek |
+    | dummy_admin@gmail.com | Admin1234 | tu/admin |
+    | dummy_admin2@gmail.com | Admin1234 | tu/admin |
+    | dummy_peagwai@gmail.com | Admin1234 | pegawai |
+    | dummy_rpl@gmail.com | Admin1234 | user (kapro rpl) |
+    | dummy_bkk@gmail.com | Admin1234 | user (bkk) |
+
+servers:
+  - url: http://192.168.0.105:7000/api
+    description: Local dev (default IP – ganti sesuai jaringan)
+  - url: http://10.0.2.2:7000/api
+    description: Android Emulator
+
+tags:
+  - name: Auth
+    description: Login, logout, profil, ganti & reset password
+  - name: Surat Masuk
+    description: Manajemen surat masuk
+  - name: Surat Keluar
+    description: Manajemen surat keluar
+  - name: Disposisi
+    description: Manajemen disposisi surat masuk
+  - name: Notifikasi
+    description: Notifikasi in-app
+  - name: File
+    description: Unduh file PDF surat
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT yang didapat dari POST /api/auth/login
+
+  schemas:
+
+    SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Berhasil
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Email atau password salah
+        errors:
+          type: object
+          nullable: true
+          description: Rincian error per field (validasi)
+          example:
+            email: ["Email tidak valid"]
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nama:
+          type: string
+          example: dummy_kepsek
+        email:
+          type: string
+          format: email
+          example: dummy_kepsek@gmail.com
+        role:
+          type: string
+          enum: [kepsek, tu, admin, users, pegawai]
+          example: kepsek
+
+    LoginData:
+      type: object
+      properties:
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          $ref: '#/components/schemas/AuthUser'
+
+    LoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/LoginData'
+
+    ProfileData:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 2
+        nama:
+          type: string
+          example: dummy_admin
+        email:
+          type: string
+          format: email
+          example: dummy_admin@gmail.com
+        role:
+          type: string
+          enum: [kepsek, tu, admin, users, pegawai]
+          example: admin
+        jabatan:
+          type: string
+          example: Tata Usaha
+
+    ProfileResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/ProfileData'
+
+    ResetTokenData:
+      type: object
+      properties:
+        reset_token:
+          type: string
+          example: abc123resettoken
+
+    VerifyOtpResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/ResetTokenData'
+
+    SuratMasuk:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        no_surat:
+          type: string
+          example: 001/SM/VI/2026
+        perihal:
+          type: string
+          example: Undangan Rapat Koordinasi
+        asal_surat:
+          type: string
+          example: Dinas Pendidikan Kota
+        status:
+          type: string
+          enum: [diterima_tu, disposisi_kepsek, diteruskan, selesai]
+          example: diterima_tu
+        status_verifikasi:
+          type: string
+          enum: [menunggu, disetujui, ditolak]
+          example: menunggu
+        preview_url:
+          type: string
+          nullable: true
+          example: http://192.168.0.105:7000/preview/surat_masuk_001.jpg
+        file_url:
+          type: string
+          nullable: true
+          example: http://192.168.0.105:7000/download/surat_masuk_001.pdf
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-01T08:00:00.000Z"
+
+    SuratMasukResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/SuratMasuk'
+
+    SuratMasukListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SuratMasuk'
+
+    SuratKeluar:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        no_surat:
+          type: string
+          example: 001/SK/VI/2026
+        perihal:
+          type: string
+          example: Permohonan Dana Kegiatan
+        tujuan:
+          type: string
+          nullable: true
+          example: Komite Sekolah
+        status:
+          type: string
+          enum: [diterima_tu, selesai]
+          example: diterima_tu
+        status_verifikasi:
+          type: string
+          enum: [menunggu, disetujui, ditolak]
+          example: menunggu
+        preview_url:
+          type: string
+          nullable: true
+          example: http://192.168.0.105:7000/preview/surat_keluar_001.jpg
+        file_url:
+          type: string
+          nullable: true
+          example: http://192.168.0.105:7000/download/surat_keluar_001.pdf
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-01T09:00:00.000Z"
+
+    SuratKeluarResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/SuratKeluar'
+
+    SuratKeluarListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/SuratKeluar'
+
+    DisposisiTujuan:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 4
+        nama:
+          type: string
+          example: dummy_rpl
+
+    Disposisi:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        surat_id:
+          type: integer
+          example: 1
+        surat_no:
+          type: string
+          example: 001/SM/VI/2026
+        perihal:
+          type: string
+          example: Undangan Rapat Koordinasi
+        tujuan:
+          $ref: '#/components/schemas/DisposisiTujuan'
+        status:
+          type: string
+          enum: [belum_dibaca, dibaca, sedang_dikerjakan, selesai]
+          example: belum_dibaca
+        verification_status:
+          type: string
+          enum: [menunggu, disetujui, ditolak]
+          example: menunggu
+        catatan:
+          type: string
+          nullable: true
+          example: Harap diproses segera
+        preview_url:
+          type: string
+          example: http://192.168.0.105:7000/preview/surat_masuk_001.jpg
+        batas_waktu:
+          type: string
+          nullable: true
+          example: "2026-06-10"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-01T10:00:00.000Z"
+
+    DisposisiListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/Disposisi'
+
+    DisposisiTarget:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 4
+        nama:
+          type: string
+          example: dummy_rpl
+
+    DisposisiTargetsResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/DisposisiTarget'
+
+    Notifikasi:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Surat Masuk Baru
+        message:
+          type: string
+          example: Terdapat surat masuk baru yang perlu diverifikasi
+        type:
+          type: string
+          enum: [disposisi, approval, distribusi, surat_masuk, surat_keluar, system]
+          example: surat_masuk
+        is_read:
+          type: boolean
+          example: false
+        reference_id:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-06-01T08:05:00.000Z"
+
+    NotifikasiListData:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notifikasi'
+        unread_count:
+          type: integer
+          example: 3
+
+    NotifikasiListResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/NotifikasiListData'
+
+paths:
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Autentikasi pengguna. Mengembalikan JWT token dan data user.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: dummy_admin@gmail.com
+                password:
+                  type: string
+                  example: "Admin1234"
+      responses:
+        "200":
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                success: true
+                message: login berhasil
+                data:
+                  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example
+                  user:
+                    id: 2
+                    nama: dummy_admin
+                    email: dummy_admin@gmail.com
+                    role: admin
+        "401":
+          description: Email atau password salah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/auth/profile:
+    get:
+      tags: [Auth]
+      summary: Ambil profil user yang sedang login
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Data profil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        "401":
+          description: Token tidak valid / expired
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Logout berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /api/auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Ganti password (saat sudah login)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_password, new_password, confirm_password]
+              properties:
+                old_password:
+                  type: string
+                  example: "Admin1234"
+                new_password:
+                  type: string
+                  example: "NewPass1234"
+                confirm_password:
+                  type: string
+                  example: "NewPass1234"
+      responses:
+        "200":
+          description: Password berhasil diubah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "400":
+          description: Password lama salah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Kirim OTP reset password ke email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: dummy_admin@gmail.com
+      responses:
+        "200":
+          description: OTP berhasil dikirim
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /api/auth/resend-otp:
+    post:
+      tags: [Auth]
+      summary: Kirim ulang OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: dummy_admin@gmail.com
+      responses:
+        "200":
+          description: OTP berhasil dikirim ulang
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /api/auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verifikasi OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: dummy_admin@gmail.com
+                otp:
+                  type: string
+                  example: "123456"
+      responses:
+        "200":
+          description: OTP valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyOtpResponse'
+        "400":
+          description: OTP tidak valid atau sudah expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Set password baru
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, reset_token, new_password, confirm_password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: dummy_admin@gmail.com
+                reset_token:
+                  type: string
+                  example: abc123resettoken
+                new_password:
+                  type: string
+                  example: "NewPass1234"
+                confirm_password:
+                  type: string
+                  example: "NewPass1234"
+      responses:
+        "200":
+          description: Password berhasil direset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "400":
+          description: Token tidak valid / password tidak cocok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /surat-masuk:
+    get:
+      tags: [Surat Masuk]
+      summary: Daftar surat masuk
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [diterima_tu, disposisi_kepsek, diteruskan, selesai]
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            example: undangan
+      responses:
+        "200":
+          description: Daftar surat masuk
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuratMasukListResponse'
+
+    post:
+      tags: [Surat Masuk]
+      summary: Input surat masuk baru
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [no_surat, perihal_surat, asal_surat, tanggal_surat, file]
+              properties:
+                no_surat:
+                  type: string
+                  example: 001/SM/VI/2026
+                perihal_surat:
+                  type: string
+                  example: Undangan Rapat Koordinasi
+                asal_surat:
+                  type: string
+                  example: Dinas Pendidikan Kota
+                tanggal_surat:
+                  type: string
+                  format: date
+                  example: "2026-06-01"
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Surat masuk berhasil disimpan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuratMasukResponse'
+        "400":
+          description: Validasi gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /surat-masuk/{id}:
+    get:
+      tags: [Surat Masuk]
+      summary: Detail surat masuk
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Detail surat masuk
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuratMasukResponse'
+        "404":
+          description: Surat tidak ditemukan
+
+  /surat-masuk/{id}/verifikasi:
+    post:
+      tags: [Surat Masuk]
+      summary: Verifikasi surat masuk
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_approved]
+              properties:
+                is_approved:
+                  type: boolean
+                  example: true
+                catatan:
+                  type: string
+                  example: ""
+      responses:
+        "200":
+          description: Verifikasi berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /surat-keluar:
+    get:
+      tags: [Surat Keluar]
+      summary: Daftar surat keluar
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [diterima_tu, selesai]
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            example: permohonan
+      responses:
+        "200":
+          description: Daftar surat keluar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuratKeluarListResponse'
+
+    post:
+      tags: [Surat Keluar]
+      summary: Ajukan surat keluar baru
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [kode_surat, no_surat, perihal, tanggal_surat, file]
+              properties:
+                kode_surat:
+                  type: integer
+                  example: 1
+                no_surat:
+                  type: string
+                  example: 001/SK/VI/2026
+                perihal:
+                  type: string
+                  example: Permohonan Dana Kegiatan Prakerin
+                tanggal_surat:
+                  type: string
+                  format: date
+                  example: "2026-06-02"
+                file:
+                  type: string
+                  format: binary
+                catatan:
+                  type: string
+                  example: Mohon segera diproses
+                tujuan:
+                  type: string
+                  example: Komite Sekolah
+      responses:
+        "200":
+          description: Surat keluar berhasil diajukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuratKeluarResponse'
+        "400":
+          description: Validasi gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /surat-keluar/{id}:
+    get:
+      tags: [Surat Keluar]
+      summary: Detail surat keluar
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Detail surat keluar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuratKeluarResponse'
+        "404":
+          description: Surat tidak ditemukan
+
+  /surat-keluar/{id}/verifikasi:
+    post:
+      tags: [Surat Keluar]
+      summary: Verifikasi surat keluar
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [is_approved]
+              properties:
+                is_approved:
+                  type: boolean
+                  example: true
+                catatan:
+                  type: string
+                  example: ""
+      responses:
+        "200":
+          description: Verifikasi berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /disposisi:
+    get:
+      tags: [Disposisi]
+      summary: Daftar disposisi
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [belum_dibaca, dibaca, sedang_dikerjakan, selesai]
+        - name: verification_status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [menunggu, disetujui, ditolak]
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            example: undangan
+      responses:
+        "200":
+          description: Daftar disposisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisposisiListResponse'
+
+    post:
+      tags: [Disposisi]
+      summary: Buat disposisi baru
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [surat_masuk_id, tujuan_ids]
+              properties:
+                surat_masuk_id:
+                  type: integer
+                  example: 1
+                tujuan_ids:
+                  type: array
+                  items:
+                    type: integer
+                  example: [4, 6]
+                catatan:
+                  type: string
+                  example: Harap ditindaklanjuti sebelum akhir bulan
+                sifat:
+                  type: string
+                  example: segera
+                batas_waktu:
+                  type: string
+                  example: "2026-06-10"
+      responses:
+        "200":
+          description: Disposisi berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+        "400":
+          description: Validasi gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /disposisi/approve:
+    post:
+      tags: [Disposisi]
+      summary: Approve / tolak disposisi
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [disposisi_id, is_approved]
+              properties:
+                disposisi_id:
+                  type: integer
+                  example: 1
+                is_approved:
+                  type: boolean
+                  example: true
+                catatan:
+                  type: string
+                  example: ""
+      responses:
+        "200":
+          description: Approval berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /users/disposisi-targets:
+    get:
+      tags: [Disposisi]
+      summary: Daftar target penerima disposisi
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Daftar user target disposisi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisposisiTargetsResponse'
+
+  /notifications:
+    get:
+      tags: [Notifikasi]
+      summary: Daftar notifikasi milik user
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+        - name: unread_only
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ["true", "false"]
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [disposisi, approval, distribusi, surat_masuk, surat_keluar, system]
+      responses:
+        "200":
+          description: Daftar notifikasi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotifikasiListResponse'
+
+  /notifications/{id}/read:
+    put:
+      tags: [Notifikasi]
+      summary: Tandai notifikasi sebagai sudah dibaca
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        "200":
+          description: Notifikasi ditandai sudah dibaca
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessEnvelope'
+
+  /download/{filename}:
+    get:
+      tags: [File]
+      summary: Unduh file PDF surat
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          example: surat_masuk_001.pdf
+      responses:
+        "200":
+          description: File PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: File tidak ditemukan
+
+security:
+  - BearerAuth: []

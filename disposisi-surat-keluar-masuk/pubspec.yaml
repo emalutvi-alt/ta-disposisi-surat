@@ -1,0 +1,42 @@
+﻿name: ta_mobile_disposisi_surat
+description: "E-Disposisi Surat Sekolah"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  flutter_svg: ^2.0.9
+  flutter:
+    sdk: flutter
+  dio: ^5.4.3
+  flutter_secure_storage: ^9.2.4
+  provider: ^6.1.2
+  url_launcher: ^6.3.1
+  intl: ^0.20.2
+  gal: ^2.3.0
+  permission_handler: ^11.3.1
+  path_provider: ^2.1.3
+  file_picker: ^8.1.2
+  cupertino_icons: ^1.0.8
+  flutter_localizations:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/logo.png
+    - assets/images/logosmk.jpg
+    - assets/images/undangan.png
+    - assets/images/logoapk.png
+    - assets/icons/ic_home.svg
+    - assets/icons/ic_history.svg
+    - assets/icons/ic_profile.svg
+    - assets/icons/ic_inmail.svg
+    - assets/icons/ic_outmail.svg

@@ -1,0 +1,33 @@
+# Flutter
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+
+# Androidgit add disposisi-surat-keluar-masuk\pubspec.yaml
+.gradle/
+android/.gradle/
+local.properties
+android/local.properties
+
+# iOS
+ios/Flutter/ephemeral/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# Generated files
+GeneratedPluginRegistrant.java
+
+# Native build
+.cxx/
+
+# Capture files
+captures/
+
+# Keystore (jangan upload)
+key.properties
+**/*.keystore
+**/*.jks
