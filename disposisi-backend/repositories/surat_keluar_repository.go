@@ -42,13 +42,6 @@ func (r *SuratKeluarRepository) List(filter dto.SuratKeluarFilter) ([]models.Sur
 	var list []models.SuratKeluar
 	q := r.db.Model(&models.SuratKeluar{})
 
-	// ── ARSIP FILTER ──────────────────────────────────────────────────────
-	if filter.ArsipOnly {
-		q = q.Where("is_arsip = ?", true)
-	} else {
-		q = q.Where("is_arsip = ?", false) // Default: tidak tampilkan arsip
-	}
-
 	if filter.Status != "" {
 		q = q.Where("status_verifikasi = ?", filter.Status)
 	}

@@ -87,7 +87,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 func abortUnauthorized(c *gin.Context, detail string) {
 	log.Printf("[AuthMiddleware] 401 unauthorized: %s", detail)
-	utils.ErrorUnauthorized(c, "unauthorized")
+	utils.ErrorUnauthorized(c, "Akses tidak sah")
 	c.Abort()
 }
 

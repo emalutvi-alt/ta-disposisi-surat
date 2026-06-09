@@ -86,7 +86,7 @@ type ConvertAllPagesResult struct {
 func ConvertPDFAllPages(pdfPath string, suratType string, suratID uint) (*ConvertAllPagesResult, error) {
 	// Validasi file sebelum proses
 	if err := validatePDFFile(pdfPath); err != nil {
-		return nil, fmt.Errorf("validasi PDF gagal: %w", err)
+		return nil, fmt.Errorf("File PDF tidak valid")
 	}
 
 	// Buat direktori output

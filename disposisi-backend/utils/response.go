@@ -3,6 +3,7 @@ package utils
 import (
 	"net/http"
 
+	"github.com/fiorelln/disposisi/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,39 +16,31 @@ type APIResponse struct {
 }
 
 func Success(c *gin.Context, status int, message string, data interface{}) {
-	c.JSON(status, APIResponse{
-		Success: true,
-		Message: message,
-		Data:    data,
-	})
+	c.JSON(status, response.APIResponse{Success: true, Message: message, Data: data})
 }
 
 func SuccessOK(c *gin.Context, message string, data interface{}) {
-	Success(c, http.StatusOK, message, data)
+	response.Success(c, message, data)
 }
 
 func Error(c *gin.Context, status int, message string, errors interface{}) {
-	c.JSON(status, APIResponse{
-		Success: false,
-		Message: message,
-		Errors:  errors,
-	})
+	c.JSON(status, response.APIResponse{Success: false, Message: message, Errors: errors})
 }
 
 func ErrorBadRequest(c *gin.Context, message string, errors interface{}) {
-	Error(c, http.StatusBadRequest, message, errors)
+	response.BadRequest(c, message, errors)
 }
 
 func ErrorUnauthorized(c *gin.Context, message string) {
-	Error(c, http.StatusUnauthorized, message, nil)
+	response.Unauthorized(c, message)
 }
 
 func ErrorForbidden(c *gin.Context, message string) {
-	Error(c, http.StatusForbidden, message, nil)
+	response.Forbidden(c, message)
 }
 
 func ErrorNotFound(c *gin.Context, message string) {
-	Error(c, http.StatusNotFound, message, nil)
+	response.NotFound(c, message)
 }
 
 func ErrorTooManyRequests(c *gin.Context, message string) {

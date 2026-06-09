@@ -22,19 +22,19 @@ func NewSuratMasukController(svc *services.SuratMasukService) *SuratMasukControl
 func (h *SuratMasukController) Create(c *gin.Context) {
 	var req dto.CreateSuratMasukRequest
 	if err := c.ShouldBind(&req); err != nil {
-		utils.ErrorBadRequest(c, "validation failed", err.Error())
+		utils.ErrorBadRequest(c, "Validasi gagal", err.Error())
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		utils.ErrorBadRequest(c, "validation failed", map[string]string{"file": "file wajib diupload"})
+		utils.ErrorBadRequest(c, "File wajib diupload", nil)
 		return
 	}
 
 	actorID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 	data, err := h.svc.Create(actorID, req, file)
@@ -42,7 +42,7 @@ func (h *SuratMasukController) Create(c *gin.Context) {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", data)
+	utils.SuccessOK(c, "Surat masuk berhasil diupload", data)
 }
 
 func (h *SuratMasukController) List(c *gin.Context) {
@@ -57,7 +57,7 @@ func (h *SuratMasukController) List(c *gin.Context) {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", list)
+	utils.SuccessOK(c, "Data berhasil diambil", list)
 }
 
 func (h *SuratMasukController) GetByID(c *gin.Context) {
@@ -70,7 +70,7 @@ func (h *SuratMasukController) GetByID(c *gin.Context) {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", data)
+	utils.SuccessOK(c, "Data berhasil diambil", data)
 }
 
 func (h *SuratMasukController) Update(c *gin.Context) {
@@ -89,7 +89,7 @@ func (h *SuratMasukController) Update(c *gin.Context) {
 	}
 	actorID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 	data, err := h.svc.Update(actorID, id, req, file)
@@ -107,7 +107,7 @@ func (h *SuratMasukController) Delete(c *gin.Context) {
 	}
 	actorID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 	if err := h.svc.Delete(actorID, id); err != nil {
@@ -124,12 +124,12 @@ func (h *SuratMasukController) Verifikasi(c *gin.Context) {
 	}
 	userID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 	var req dto.VerifikasiSuratMasukRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorBadRequest(c, "validation failed", err.Error())
+		utils.ErrorBadRequest(c, "Validasi gagal", err.Error())
 		return
 	}
 	data, err := h.svc.Verifikasi(id, userID, req)
@@ -137,7 +137,71 @@ func (h *SuratMasukController) Verifikasi(c *gin.Context) {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", data)
+	utils.SuccessOK(c, "Verifikasi surat berhasil diproses", data)
+}
+
+func (h *SuratMasukController) KonfirmasiTU(c *gin.Context) {
+	id, err := parseIDParam(c)
+	if err != nil {
+		return
+	}
+	userID, err := utils.GetUserID(c)
+	if err != nil {
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
+		return
+	}
+	var req dto.KonfirmasiTUSuratMasukRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorBadRequest(c, "Validasi gagal", err.Error())
+		return
+	}
+	data, err := h.svc.KonfirmasiTU(userID, id, req)
+	if err != nil {
+		h.handleSuratError(c, err)
+		return
+	}
+	utils.SuccessOK(c, "Konfirmasi TU berhasil diproses", data)
+}
+
+func (h *SuratMasukController) KirimKeUser(c *gin.Context) {
+	id, err := parseIDParam(c)
+	if err != nil {
+		return
+	}
+	userID, err := utils.GetUserID(c)
+	if err != nil {
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
+		return
+	}
+	var req dto.KirimSuratMasukKeUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorBadRequest(c, "Catatan Wakil Kepala Sekolah wajib diisi", nil)
+		return
+	}
+	data, err := h.svc.KirimKeUser(userID, id, req)
+	if err != nil {
+		h.handleSuratError(c, err)
+		return
+	}
+	utils.SuccessOK(c, "Surat berhasil dikirim ke penerima", data)
+}
+
+func (h *SuratMasukController) KonfirmasiPenerimaan(c *gin.Context) {
+	id, err := parseIDParam(c)
+	if err != nil {
+		return
+	}
+	userID, err := utils.GetUserID(c)
+	if err != nil {
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
+		return
+	}
+	data, err := h.svc.KonfirmasiPenerimaan(userID, id)
+	if err != nil {
+		h.handleSuratError(c, err)
+		return
+	}
+	utils.SuccessOK(c, "Penerimaan surat berhasil dikonfirmasi", data)
 }
 
 func (h *SuratMasukController) handleSuratError(c *gin.Context, err error) {
@@ -145,23 +209,24 @@ func (h *SuratMasukController) handleSuratError(c *gin.Context, err error) {
 	case errors.Is(err, services.ErrSuratNotFound):
 		utils.Error(c, http.StatusNotFound, "surat tidak ditemukan", nil)
 	default:
-		utils.ErrorBadRequest(c, "validation failed", err.Error())
+		utils.ErrorBadRequest(c, err.Error(), nil)
 	}
 }
+
 // Tambah method GetPages
 func (h *SuratMasukController) GetPages(c *gin.Context) {
-    id, err := parseIDParam(c)
-    if err != nil {
-        return
-    }
-    pages, err := h.svc.GetPages(id)
-    if err != nil {
-        h.handleSuratError(c, err)
-        return
-    }
-    utils.SuccessOK(c, "success", gin.H{
-        "surat_id":    id,
-        "total_pages": len(pages),
-        "pages":       pages,
-    })
+	id, err := parseIDParam(c)
+	if err != nil {
+		return
+	}
+	pages, err := h.svc.GetPages(id)
+	if err != nil {
+		h.handleSuratError(c, err)
+		return
+	}
+	utils.SuccessOK(c, "Data berhasil diambil", gin.H{
+		"surat_id":    id,
+		"total_pages": len(pages),
+		"pages":       pages,
+	})
 }

@@ -22,19 +22,19 @@ func NewSuratKeluarController(svc *services.SuratKeluarService) *SuratKeluarCont
 func (h *SuratKeluarController) Create(c *gin.Context) {
 	var req dto.CreateSuratKeluarRequest
 	if err := c.ShouldBind(&req); err != nil {
-		utils.ErrorBadRequest(c, "validation failed", err.Error())
+		utils.ErrorBadRequest(c, "Validasi gagal", err.Error())
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		utils.ErrorBadRequest(c, "validation failed", map[string]string{"file": "file wajib diupload"})
+		utils.ErrorBadRequest(c, "File wajib diupload", nil)
 		return
 	}
 
 	actorID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 	data, err := h.svc.Create(actorID, req, file)
@@ -42,7 +42,7 @@ func (h *SuratKeluarController) Create(c *gin.Context) {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", data)
+	utils.SuccessOK(c, "Surat keluar berhasil diupload", data)
 }
 
 func (h *SuratKeluarController) List(c *gin.Context) {
@@ -51,14 +51,13 @@ func (h *SuratKeluarController) List(c *gin.Context) {
 		TanggalAwal:  c.Query("tanggal_awal"),
 		TanggalAkhir: c.Query("tanggal_akhir"),
 		Search:       c.Query("search"),
-		ArsipOnly:    c.Query("arsip") == "true", // ← NEW
 	}
 	list, err := h.svc.List(filter)
 	if err != nil {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", list)
+	utils.SuccessOK(c, "Data berhasil diambil", list)
 }
 
 func (h *SuratKeluarController) GetByID(c *gin.Context) {
@@ -71,7 +70,7 @@ func (h *SuratKeluarController) GetByID(c *gin.Context) {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", data)
+	utils.SuccessOK(c, "Data berhasil diambil", data)
 }
 
 func (h *SuratKeluarController) Update(c *gin.Context) {
@@ -90,7 +89,7 @@ func (h *SuratKeluarController) Update(c *gin.Context) {
 	}
 	actorID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 	data, err := h.svc.Update(actorID, id, req, file)
@@ -108,7 +107,7 @@ func (h *SuratKeluarController) Delete(c *gin.Context) {
 	}
 	actorID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 	if err := h.svc.Delete(actorID, id); err != nil {
@@ -125,12 +124,12 @@ func (h *SuratKeluarController) Verifikasi(c *gin.Context) {
 	}
 	userID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 	var req dto.VerifikasiSuratKeluarRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorBadRequest(c, "validation failed", err.Error())
+		utils.ErrorBadRequest(c, "Validasi gagal", err.Error())
 		return
 	}
 	data, err := h.svc.Verifikasi(id, userID, req)
@@ -138,7 +137,25 @@ func (h *SuratKeluarController) Verifikasi(c *gin.Context) {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", data)
+	utils.SuccessOK(c, "Verifikasi surat berhasil diproses", data)
+}
+
+func (h *SuratKeluarController) KonfirmasiTU(c *gin.Context) {
+	id, err := parseIDParam(c)
+	if err != nil {
+		return
+	}
+	userID, err := utils.GetUserID(c)
+	if err != nil {
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
+		return
+	}
+	data, err := h.svc.KonfirmasiTU(userID, id)
+	if err != nil {
+		h.handleSuratError(c, err)
+		return
+	}
+	utils.SuccessOK(c, "Konfirmasi TU berhasil diproses", data)
 }
 
 func (h *SuratKeluarController) Distribusi(c *gin.Context) {
@@ -148,19 +165,19 @@ func (h *SuratKeluarController) Distribusi(c *gin.Context) {
 	}
 	var req dto.DistribusiSuratKeluarRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorBadRequest(c, "validation failed", err.Error())
+		utils.ErrorBadRequest(c, "Validasi gagal", err.Error())
 		return
 	}
 	actorID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 	if err := h.svc.Distribusi(actorID, id, req); err != nil {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", nil)
+	utils.SuccessOK(c, "Data berhasil disimpan", nil)
 }
 
 func (h *SuratKeluarController) handleSuratError(c *gin.Context, err error) {
@@ -168,7 +185,7 @@ func (h *SuratKeluarController) handleSuratError(c *gin.Context, err error) {
 	case errors.Is(err, services.ErrSuratNotFound):
 		utils.Error(c, http.StatusNotFound, "surat tidak ditemukan", nil)
 	default:
-		utils.ErrorBadRequest(c, "validation failed", err.Error())
+		utils.ErrorBadRequest(c, err.Error(), nil)
 	}
 }
 
@@ -183,62 +200,9 @@ func (h *SuratKeluarController) GetPages(c *gin.Context) {
 		h.handleSuratError(c, err)
 		return
 	}
-	utils.SuccessOK(c, "success", gin.H{
+	utils.SuccessOK(c, "Data berhasil diambil", gin.H{
 		"surat_id":    id,
 		"total_pages": len(pages),
 		"pages":       pages,
 	})
-}
-
-// ── ARSIP METHODS ────────────────────────────────────────────────────────
-
-// Arsipkan POST /surat-keluar/:id/arsip
-func (h *SuratKeluarController) Arsipkan(c *gin.Context) {
-	id, err := parseIDParam(c)
-	if err != nil {
-		return
-	}
-	actorID, err := utils.GetUserID(c)
-	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
-		return
-	}
-	if err := h.svc.Arsipkan(actorID, id); err != nil {
-		h.handleSuratError(c, err)
-		return
-	}
-	utils.SuccessOK(c, "surat berhasil diarsipkan", nil)
-}
-
-// RestoreArsip POST /surat-keluar/:id/restore
-func (h *SuratKeluarController) RestoreArsip(c *gin.Context) {
-	id, err := parseIDParam(c)
-	if err != nil {
-		return
-	}
-	actorID, err := utils.GetUserID(c)
-	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
-		return
-	}
-	if err := h.svc.RestoreArsip(actorID, id); err != nil {
-		h.handleSuratError(c, err)
-		return
-	}
-	utils.SuccessOK(c, "surat berhasil dikembalikan dari arsip", nil)
-}
-
-// ListArsip GET /arsip/surat-keluar
-func (h *SuratKeluarController) ListArsip(c *gin.Context) {
-	filter := dto.SuratKeluarFilter{
-		ArsipOnly: true,
-		Status:    c.Query("status"),
-		Search:    c.Query("search"),
-	}
-	list, err := h.svc.List(filter)
-	if err != nil {
-		h.handleSuratError(c, err)
-		return
-	}
-	utils.SuccessOK(c, "success", list)
 }

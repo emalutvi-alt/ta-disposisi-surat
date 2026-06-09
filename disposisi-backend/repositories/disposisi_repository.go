@@ -55,6 +55,15 @@ func (r *DisposisiRepository) Update(d *models.Disposisi) error {
 	return r.db.Save(d).Error
 }
 
+func (r *DisposisiRepository) MarkRiwayatWaka(suratMasukID, wakaID uint) error {
+	return r.db.Model(&models.Disposisi{}).
+		Where("id_surat_masuk = ? AND id_penerima = ?", suratMasukID, wakaID).
+		Updates(map[string]interface{}{
+			"riwayat_waka":     true,
+			"status_disposisi": "selesai",
+		}).Error
+}
+
 func (r *DisposisiRepository) FindBySuratMasukID(suratMasukID uint) ([]models.Disposisi, error) {
 	var list []models.Disposisi
 	err := r.db.

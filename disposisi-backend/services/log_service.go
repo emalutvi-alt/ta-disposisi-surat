@@ -12,20 +12,21 @@ import (
 
 // Audit action constants (used across services — do not hardcode strings elsewhere).
 const (
-	AuditLogin            = "login"
-	AuditLogout           = "logout"
-	AuditCreateSuratMasuk = "create_surat_masuk"
-	AuditUpdateSuratMasuk = "update_surat_masuk"
-	AuditDeleteSuratMasuk = "delete_surat_masuk"
-	AuditVerifySuratMasuk = "verify_surat_masuk"
+	AuditLogin             = "login"
+	AuditLogout            = "logout"
+	AuditCreateSuratMasuk  = "create_surat_masuk"
+	AuditUpdateSuratMasuk  = "update_surat_masuk"
+	AuditDeleteSuratMasuk  = "delete_surat_masuk"
+	AuditVerifySuratMasuk  = "verify_surat_masuk"
 	AuditCreateSuratKeluar = "create_surat_keluar"
 	AuditUpdateSuratKeluar = "update_surat_keluar"
 	AuditDeleteSuratKeluar = "delete_surat_keluar"
 	AuditVerifySuratKeluar = "verify_surat_keluar"
-	AuditDistribusiSK     = "distribusi_surat_keluar"
-	AuditCreateDisposisi  = "create_disposisi"
-	AuditApproveDisposisi = "approve_disposisi"
-	AuditDownloadFile     = "download_file"
+	AuditDistribusiSK      = "distribusi_surat_keluar"
+	AuditCreateDisposisi   = "create_disposisi"
+	AuditApproveDisposisi  = "approve_disposisi"
+	AuditDownloadFile      = "download_file"
+	AuditDownloadPreview   = "download_preview"
 )
 
 type LogService struct {
@@ -41,12 +42,17 @@ func NewLogService(
 }
 
 type AuditLogInput struct {
-	UserID     *uint
-	Action     string
-	Table      string
-	RecordID   *uint
-	OldValue   string
-	NewValue   string
+	UserID    *uint
+	Role      string
+	Action    string
+	Table     string
+	RecordID  *uint
+	OldValue  string
+	NewValue  string
+	OldStatus string
+	NewStatus string
+	IPAddress string
+	UserAgent string
 }
 
 type DistribusiLogInput struct {
@@ -63,11 +69,18 @@ func (s *LogService) WriteAuditLog(input AuditLogInput) {
 		UserID:       input.UserID,
 		Aksi:         strPtr(input.Action),
 		TabelTerkait: strPtrEmpty(input.Table),
+		Role:         strPtrEmpty(input.Role),
+		Entity:       strPtrEmpty(input.Table),
+		OldStatus:    strPtrEmpty(input.OldStatus),
+		NewStatus:    strPtrEmpty(input.NewStatus),
+		IPAddress:    strPtrEmpty(input.IPAddress),
+		UserAgent:    strPtrEmpty(input.UserAgent),
 		UpdatedAt:    time.Now(),
 	}
 	if input.RecordID != nil {
 		id := int(*input.RecordID)
 		entry.IDData = &id
+		entry.EntityID = input.RecordID
 	}
 	if input.OldValue != "" {
 		entry.ValuesOld = &input.OldValue
@@ -187,4 +200,3 @@ func strPtrEmpty(s string) *string {
 func strPtr(s string) *string {
 	return &s
 }
-

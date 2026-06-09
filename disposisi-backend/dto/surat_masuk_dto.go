@@ -4,13 +4,12 @@ import "time"
 
 // CreateSuratMasukRequest metadata for multipart create (file handled separately).
 type CreateSuratMasukRequest struct {
-	NoSurat      string `form:"no_surat" binding:"required"`
+	NoSurat      string `form:"no_surat" binding:"required,max=50"`
 	PerihalSurat string `form:"perihal_surat" binding:"required"`
 	AsalSurat    string `form:"asal_surat" binding:"required"`
 	TanggalSurat string `form:"tanggal_surat" binding:"required"` // YYYY-MM-DD
 }
 
-// UpdateSuratMasukRequest for PUT (optional file re-upload).
 type UpdateSuratMasukRequest struct {
 	NoSurat      string `form:"no_surat"`
 	PerihalSurat string `form:"perihal_surat"`
@@ -29,13 +28,21 @@ type VerifikasiSuratMasukRequest struct {
 	KoordinasiKonfirmasi string `json:"koordinasi_konfirmasi"`
 }
 
+type KonfirmasiTUSuratMasukRequest struct {
+	WakaIDs []uint `json:"waka_ids"`
+}
+
+type KirimSuratMasukKeUserRequest struct {
+	UserIDs []uint `json:"user_ids" binding:"required,min=1"`
+	Catatan string `json:"catatan" binding:"required"`
+}
+
 // SuratMasukFilter berisi filter untuk query list surat masuk.
 type SuratMasukFilter struct {
 	Status       string
 	TanggalAwal  string
 	TanggalAkhir string
 	Search       string
-	ArsipOnly    bool   // ← NEW: true = hanya arsip
 }
 
 // PDFPageDTO merepresentasikan satu halaman preview PDF untuk Flutter.
@@ -46,17 +53,16 @@ type PDFPageDTO struct {
 
 // SuratMasukResponse — DIPERBARUI dengan fields halaman
 type SuratMasukResponse struct {
-    ID               uint         `json:"id"`
-    NoSurat          string       `json:"no_surat"`
-    Perihal          string       `json:"perihal"`
-    AsalSurat        string       `json:"asal_surat"`
-    Status           string       `json:"status"`
-    StatusVerifikasi string       `json:"status_verifikasi,omitempty"`
-    StatusAlur       string       `json:"status_alur,omitempty"`
-    FileURL          string       `json:"file_url"`
-    PreviewURL       string       `json:"preview_url"`    // halaman pertama (compat)
-    TotalPages       int          `json:"total_pages"`    // ← BARU
-    Pages            []PDFPageDTO `json:"pages"`          // ← BARU: SEMUA halaman
-    CreatedAt        time.Time    `json:"created_at"`
-    IsArsip          bool         `json:"is_arsip"`       // ← BARU
+	ID               uint         `json:"id"`
+	NoSurat          string       `json:"no_surat"`
+	Perihal          string       `json:"perihal"`
+	AsalSurat        string       `json:"asal_surat"`
+	Status           string       `json:"status"`
+	StatusVerifikasi string       `json:"status_verifikasi,omitempty"`
+	StatusAlur       string       `json:"status_alur,omitempty"`
+	FileURL          string       `json:"file_url,omitempty"`
+	PreviewURL       string       `json:"preview_url"` // halaman pertama (compat)
+	TotalPages       int          `json:"total_pages"` // ← BARU
+	Pages            []PDFPageDTO `json:"pages"`       // ← BARU: SEMUA halaman
+	CreatedAt        time.Time    `json:"created_at"`
 }

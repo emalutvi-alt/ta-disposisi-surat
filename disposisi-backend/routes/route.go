@@ -11,7 +11,7 @@ func SetupRoutes(
 	r *gin.Engine,
 	container *services.Container,
 ) {
-	
+
 	// Scalar API docs
 	r.StaticFile("/docs", "./docs/index.html")
 	r.StaticFile("/openapi.yaml", "./openapi.yaml")
@@ -44,9 +44,11 @@ func SetupRoutes(
 		authorized.GET("/surat-masuk", suratMasukCtrl.List)
 		authorized.GET("/surat-masuk/:id", suratMasukCtrl.GetByID)
 		authorized.POST("/surat-masuk", suratMasukCtrl.Create)
-		authorized.PUT("/surat-masuk/:id", suratMasukCtrl.Update)
-		authorized.DELETE("/surat-masuk/:id", suratMasukCtrl.Delete)
 		authorized.POST("/surat-masuk/:id/verifikasi", suratMasukCtrl.Verifikasi)
+		authorized.POST("/surat-masuk/:id/konfirmasi-tu", suratMasukCtrl.KonfirmasiTU)
+		authorized.POST("/surat-masuk/:id/kirim-ke-user", suratMasukCtrl.KirimKeUser)
+		authorized.POST("/surat-masuk/:id/konfirmasi-penerimaan", suratMasukCtrl.KonfirmasiPenerimaan)
+		authorized.GET("/surat-masuk/:id/pages", suratMasukCtrl.GetPages)
 
 		// Unified Disposisi Surat Masuk (Kepsek)
 		unifiedCtrl := controllers.NewUnifiedController(container.Unified)
@@ -57,9 +59,9 @@ func SetupRoutes(
 		authorized.GET("/surat-keluar", suratKeluarCtrl.List)
 		authorized.GET("/surat-keluar/:id", suratKeluarCtrl.GetByID)
 		authorized.POST("/surat-keluar", suratKeluarCtrl.Create)
-		authorized.PUT("/surat-keluar/:id", suratKeluarCtrl.Update)
-		authorized.DELETE("/surat-keluar/:id", suratKeluarCtrl.Delete)
 		authorized.POST("/surat-keluar/:id/verifikasi", suratKeluarCtrl.Verifikasi)
+		authorized.POST("/surat-keluar/:id/konfirmasi-tu", suratKeluarCtrl.KonfirmasiTU)
+		authorized.GET("/surat-keluar/:id/pages", suratKeluarCtrl.GetPages)
 
 		// Unified Verifikasi Surat Keluar (Kepsek)
 		authorized.POST("/surat-keluar/:id/verifikasi-unified", unifiedCtrl.ProcessSuratKeluarVerifikasi)
@@ -67,22 +69,11 @@ func SetupRoutes(
 		// User - Mark surat dibaca
 		authorized.PUT("/surat/:id/dibaca", unifiedCtrl.MarkSuratAsRead)
 
-		// Disposisi
-		disposisiCtrl := controllers.NewDisposisiController(container.Disposisi)
-		authorized.GET("/disposisi", disposisiCtrl.List)
-		authorized.GET("/disposisi/:id", disposisiCtrl.ListBySurat)
-		authorized.POST("/disposisi", disposisiCtrl.Create)
-		authorized.POST("/disposisi/:id/approve", disposisiCtrl.Approve)
-		authorized.POST("/disposisi/:id/selesai", disposisiCtrl.MarkSelesai)
-
-		// Distribusi
-		authorized.GET("/distribusi", disposisiCtrl.ListBySurat)
-		authorized.POST("/distribusi", disposisiCtrl.Create)
-		authorized.PUT("/distribusi/:id", disposisiCtrl.Approve)
-
 		// Dashboard
 		dashboardCtrl := controllers.NewDashboardController(container.Dashboard)
 		authorized.GET("/dashboard", dashboardCtrl.Stats)
+		authorized.GET("/dashboard/aktif", dashboardCtrl.Aktif)
+		authorized.GET("/riwayat", dashboardCtrl.Riwayat)
 
 		// Notifications
 		notifCtrl := controllers.NewNotificationController(container.Notification)
@@ -102,6 +93,7 @@ func SetupRoutes(
 
 		// Download
 		downloadCtrl := controllers.NewDownloadController(container.Log)
-		authorized.GET("/download/:filename", downloadCtrl.Download)
+		authorized.GET("/surat-masuk/:id/preview/:page/download", downloadCtrl.DownloadSuratMasukPreview)
+		authorized.GET("/surat-keluar/:id/preview/:page/download", downloadCtrl.DownloadSuratKeluarPreview)
 	}
 }

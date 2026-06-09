@@ -20,7 +20,7 @@ type SuratKeluar struct {
 	CreatedAt         time.Time  `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt         time.Time  `gorm:"column:updated_at" json:"updated_at"`
 	StatusAlur        string     `gorm:"column:status_alur;default:diterima_tu" json:"status_alur"`
-	IsArsip           bool       `gorm:"column:is_arsip;default:false" json:"is_arsip"` // ← NEW: Arsip flag
+	RiwayatTU         bool       `gorm:"column:riwayat_tu;default:false" json:"riwayat_tu"`
 
 	Distribusis []DistribusiSK `gorm:"foreignKey:SuratKeluarID;references:ID" json:"distribusis,omitempty"`
 }

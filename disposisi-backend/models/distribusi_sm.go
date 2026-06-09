@@ -11,6 +11,7 @@ type DistribusiSM struct {
 	ReadAt      *time.Time `gorm:"column:read_at" json:"read_at,omitempty"`
 	CreatedAt   time.Time  `gorm:"column:created_at" json:"created_at"`
 	Status      string     `gorm:"column:status;default:belum_dibaca" json:"status"`
+	RiwayatUser bool       `gorm:"column:riwayat_user;default:false" json:"riwayat_user"`
 
 	Disposisi Disposisi `gorm:"foreignKey:DisposisiID;references:ID" json:"disposisi,omitempty"`
 	User      *User     `gorm:"foreignKey:UserID;references:ID" json:"user,omitempty"`

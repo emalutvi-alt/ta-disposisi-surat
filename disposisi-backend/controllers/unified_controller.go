@@ -25,7 +25,7 @@ func NewUnifiedController(unifiedSvc *services.UnifiedService) *UnifiedControlle
 func (h *UnifiedController) ProcessSuratMasukDisposisi(c *gin.Context) {
 	userID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 
@@ -36,17 +36,12 @@ func (h *UnifiedController) ProcessSuratMasukDisposisi(c *gin.Context) {
 
 	var req dto.UnifiedDisposisiRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorBadRequest(c, "validation failed", err.Error())
+		utils.ErrorBadRequest(c, "Validasi gagal", err.Error())
 		return
 	}
 
 	if req.Status == "ditolak" && req.Catatan == "" {
-		utils.ErrorBadRequest(c, "catatan wajib diisi saat menolak surat", nil)
-		return
-	}
-
-	if req.Status == "disetujui" && len(req.Tujuan) == 0 {
-		utils.ErrorBadRequest(c, "tujuan disposisi wajib dipilih", nil)
+		utils.ErrorBadRequest(c, "Catatan Kepala Sekolah wajib diisi", nil)
 		return
 	}
 
@@ -68,7 +63,7 @@ func (h *UnifiedController) ProcessSuratMasukDisposisi(c *gin.Context) {
 func (h *UnifiedController) ProcessSuratKeluarVerifikasi(c *gin.Context) {
 	userID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 
@@ -79,12 +74,12 @@ func (h *UnifiedController) ProcessSuratKeluarVerifikasi(c *gin.Context) {
 
 	var req dto.UnifiedDisposisiRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.ErrorBadRequest(c, "validation failed", err.Error())
+		utils.ErrorBadRequest(c, "Validasi gagal", err.Error())
 		return
 	}
 
 	if req.Status == "ditolak" && req.Catatan == "" {
-		utils.ErrorBadRequest(c, "catatan wajib diisi saat menolak surat", nil)
+		utils.ErrorBadRequest(c, "Catatan Kepala Sekolah wajib diisi", nil)
 		return
 	}
 
@@ -106,7 +101,7 @@ func (h *UnifiedController) ProcessSuratKeluarVerifikasi(c *gin.Context) {
 func (h *UnifiedController) MarkSuratAsRead(c *gin.Context) {
 	userID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 

@@ -17,6 +17,7 @@ type Disposisi struct {
 	StatusDisposisi      string     `gorm:"column:status_disposisi;default:belum_dibaca" json:"status_disposisi"`
 	StatusApproval       string     `gorm:"column:status_approval;default:menunggu" json:"status_approval"`
 	ApprovalAt           *time.Time `gorm:"column:approval_at" json:"approval_at,omitempty"`
+	RiwayatWaka          bool       `gorm:"column:riwayat_waka;default:false" json:"riwayat_waka"`
 
 	SuratMasuk SuratMasuk `gorm:"foreignKey:SuratMasukID;references:ID" json:"surat_masuk,omitempty"`
 	Kepsek     User       `gorm:"foreignKey:KepsekID;references:ID" json:"kepsek,omitempty"`

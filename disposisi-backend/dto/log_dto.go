@@ -34,3 +34,29 @@ type DashboardStatsResponse struct {
 	PendingApproval     int64 `json:"pending_approval"`
 	SuratSelesai        int64 `json:"surat_selesai"`
 }
+
+type DashboardSuratItem struct {
+	ID               uint      `json:"id"`
+	JenisSurat       string    `json:"jenis_surat"`
+	NoSurat          string    `json:"no_surat"`
+	Perihal          string    `json:"perihal"`
+	AsalSurat        string    `json:"asal_surat,omitempty"`
+	Tujuan           string    `json:"tujuan,omitempty"`
+	Status           string    `json:"status"`
+	StatusVerifikasi string    `json:"status_verifikasi,omitempty"`
+	StatusAlur       string    `json:"status_alur,omitempty"`
+	TanggalSurat     string    `json:"tanggal_surat"`
+	PreviewURL       string    `json:"preview_url,omitempty"`
+	RoleRiwayat      string    `json:"role_riwayat,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
+type DashboardListData struct {
+	Items []DashboardSuratItem `json:"items"`
+	Total int                  `json:"total"`
+}
+
+type RiwayatFilterQuery struct {
+	Filter  string
+	Tanggal string
+}

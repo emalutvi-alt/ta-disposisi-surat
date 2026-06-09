@@ -43,6 +43,9 @@ func NewSuratKeluarService(
 }
 
 func (s *SuratKeluarService) Create(actorID uint, input dto.CreateSuratKeluarRequest, file *multipart.FileHeader) (*dto.SuratKeluarResponse, error) {
+	if err := utils.ValidateNoSurat(input.NoSurat); err != nil {
+		return nil, err
+	}
 	tgl, err := time.Parse("2006-01-02", input.TanggalSurat)
 	if err != nil {
 		return nil, errors.New("format tanggal_surat harus YYYY-MM-DD")
@@ -71,11 +74,10 @@ func (s *SuratKeluarService) Create(actorID uint, input dto.CreateSuratKeluarReq
 		Tujuan:           tujuan,
 		FilePDF:          &saved.OriginalRel,
 		FilePreview:      nil,
-		StatusVerifikasi: "menunggu",
-		StatusAlur:       "diterima_tu",
+		StatusVerifikasi: utils.StatusMenungguPersetujuanKepsek,
+		StatusAlur:       utils.StatusMenungguPersetujuanKepsek,
 		CreatedAt:        now,
 		UpdatedAt:        now,
-		IsArsip:          false, // ← NEW
 	}
 
 	if err := s.repo.Create(sk); err != nil {
@@ -99,15 +101,19 @@ func (s *SuratKeluarService) Create(actorID uint, input dto.CreateSuratKeluarReq
 		}
 	} else if !saved.IsPDF && saved.PreviewRel != "" {
 		sk.FilePreview = &saved.PreviewRel
+		if s.pdfPreview != nil {
+			_ = s.pdfPreview.SaveImagePreview(SuratKeluarType, sk.ID, saved.PreviewRel)
+		}
 		_ = s.repo.Update(sk)
 	}
 
 	s.log.WriteAuditLog(AuditLogInput{
-		UserID:   &actorID,
-		Action:   AuditCreateSuratKeluar,
-		Table:    "surat_keluar",
-		RecordID: &sk.ID,
-		NewValue: sk.NoSurat,
+		UserID:    &actorID,
+		Action:    AuditCreateSuratKeluar,
+		Table:     "surat_keluar",
+		RecordID:  &sk.ID,
+		NewValue:  sk.NoSurat,
+		NewStatus: sk.StatusAlur,
 	})
 	s.notifyKepsekSuratKeluarBaru(actorID, sk)
 
@@ -153,6 +159,9 @@ func (s *SuratKeluarService) Update(actorID, id uint, input dto.UpdateSuratKelua
 		sk.KodeSurat = input.KodeSurat
 	}
 	if input.NoSurat != "" {
+		if err := utils.ValidateNoSurat(input.NoSurat); err != nil {
+			return nil, err
+		}
 		sk.NoSurat = input.NoSurat
 	}
 	if input.Perihal != "" {
@@ -196,6 +205,9 @@ func (s *SuratKeluarService) Update(actorID, id uint, input dto.UpdateSuratKelua
 			}
 		} else if !saved.IsPDF && saved.PreviewRel != "" {
 			sk.FilePreview = &saved.PreviewRel
+			if s.pdfPreview != nil {
+				_ = s.pdfPreview.SaveImagePreview(SuratKeluarType, sk.ID, saved.PreviewRel)
+			}
 		}
 	}
 
@@ -253,11 +265,14 @@ func (s *SuratKeluarService) Verifikasi(id uint, verifierID uint, input dto.Veri
 
 	oldStatus := sk.StatusVerifikasi
 	if input.IsApproved {
-		sk.StatusVerifikasi = "disetujui"
-		sk.StatusAlur = "diteruskan"
+		sk.StatusVerifikasi = utils.StatusDisetujuiKepsek
+		sk.StatusAlur = utils.StatusDisetujuiKepsek
 	} else {
-		sk.StatusVerifikasi = "ditolak"
-		sk.StatusAlur = "diterima_tu"
+		if input.Catatan == "" {
+			return nil, errors.New("Catatan Kepala Sekolah wajib diisi")
+		}
+		sk.StatusVerifikasi = utils.StatusDitolakKepsek
+		sk.StatusAlur = utils.StatusDitolakKepsek
 	}
 	sk.UpdatedAt = now
 
@@ -266,17 +281,44 @@ func (s *SuratKeluarService) Verifikasi(id uint, verifierID uint, input dto.Veri
 	}
 
 	s.log.WriteAuditLog(AuditLogInput{
-		UserID:   &verifierID,
-		Action:   AuditVerifySuratKeluar,
-		Table:    "surat_keluar",
-		RecordID: &sk.ID,
-		OldValue: oldStatus,
-		NewValue: sk.StatusVerifikasi,
+		UserID:    &verifierID,
+		Action:    AuditVerifySuratKeluar,
+		Table:     "surat_keluar",
+		RecordID:  &sk.ID,
+		OldValue:  oldStatus,
+		NewValue:  sk.StatusVerifikasi,
+		OldStatus: oldStatus,
+		NewStatus: sk.StatusAlur,
 	})
 	s.notifyAdminsVerifikasiSK(verifierID, sk, input.IsApproved)
 
 	resp := mapSuratKeluarResponse(sk)
 	return &resp, nil
+}
+
+func (s *SuratKeluarService) KonfirmasiTU(actorID, id uint) (*dto.SuratKeluarResponse, error) {
+	sk, err := s.repo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrSuratNotFound
+		}
+		return nil, err
+	}
+	if sk.StatusVerifikasi != utils.StatusDitolakKepsek && sk.StatusVerifikasi != utils.StatusDisetujuiKepsek {
+		return nil, errors.New("surat belum dapat dikonfirmasi TU")
+	}
+	oldStatus := sk.StatusAlur
+	sk.StatusAlur = utils.StatusSelesai
+	sk.RiwayatTU = true
+	sk.UpdatedAt = time.Now()
+	if err := s.repo.Update(sk); err != nil {
+		return nil, err
+	}
+	s.log.WriteAuditLog(AuditLogInput{
+		UserID: &actorID, Action: "konfirmasi_tu_surat_keluar", Table: "surat_keluar",
+		RecordID: &sk.ID, OldStatus: oldStatus, NewStatus: sk.StatusAlur,
+	})
+	return s.buildResponseWithPages(sk)
 }
 
 func (s *SuratKeluarService) Distribusi(actorID, id uint, input dto.DistribusiSuratKeluarRequest) error {
@@ -288,7 +330,7 @@ func (s *SuratKeluarService) Distribusi(actorID, id uint, input dto.DistribusiSu
 		return err
 	}
 
-	if sk.StatusVerifikasi != "disetujui" {
+	if sk.StatusVerifikasi != utils.StatusDisetujuiKepsek {
 		return errors.New("surat keluar harus disetujui sebelum distribusi")
 	}
 
@@ -341,70 +383,6 @@ func (s *SuratKeluarService) Distribusi(actorID, id uint, input dto.DistribusiSu
 	return nil
 }
 
-// ── ARSIP METHODS ────────────────────────────────────────────────────────
-
-// Arsipkan memindahkan surat keluar ke arsip.
-func (s *SuratKeluarService) Arsipkan(actorID, id uint) error {
-	sk, err := s.repo.FindByID(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrSuratNotFound
-		}
-		return err
-	}
-
-	sk.IsArsip = true
-	sk.StatusAlur = "diarsipkan"
-	sk.UpdatedAt = time.Now()
-
-	if err := s.repo.Update(sk); err != nil {
-		return err
-	}
-
-	s.log.WriteAuditLog(AuditLogInput{
-		UserID:   &actorID,
-		Action:   "arsip_surat_keluar",
-		Table:    "surat_keluar",
-		RecordID: &sk.ID,
-		NewValue: "diarsipkan",
-	})
-	return nil
-}
-
-// RestoreArsip mengembalikan surat keluar dari arsip.
-func (s *SuratKeluarService) RestoreArsip(actorID, id uint) error {
-	sk, err := s.repo.FindByID(id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrSuratNotFound
-		}
-		return err
-	}
-
-	sk.IsArsip = false
-	if sk.StatusVerifikasi == "disetujui" {
-		sk.StatusAlur = "diteruskan"
-	} else if sk.StatusVerifikasi == "ditolak" {
-		sk.StatusAlur = "diterima_tu"
-	} else {
-		sk.StatusAlur = "diterima_tu"
-	}
-	sk.UpdatedAt = time.Now()
-
-	if err := s.repo.Update(sk); err != nil {
-		return err
-	}
-
-	s.log.WriteAuditLog(AuditLogInput{
-		UserID:   &actorID,
-		Action:   "restore_arsip_surat_keluar",
-		Table:    "surat_keluar",
-		RecordID: &sk.ID,
-		NewValue: sk.StatusAlur,
-	})
-	return nil
-}
-
 // GetPages mengembalikan semua halaman preview untuk satu surat keluar.
 func (s *SuratKeluarService) GetPages(suratID uint) ([]dto.PDFPageDTO, error) {
 	if s.pdfPreview == nil {
@@ -447,9 +425,7 @@ func (s *SuratKeluarService) buildResponseWithPages(sk *models.SuratKeluar) (*dt
 func mapSuratKeluarResponse(sk *models.SuratKeluar) dto.SuratKeluarResponse {
 	fileURL := ""
 	previewURL := ""
-	if sk.FilePDF != nil {
-		fileURL = utils.BuildFileURL(*sk.FilePDF)
-	}
+	_ = fileURL
 	if sk.FilePreview != nil {
 		previewURL = utils.BuildPreviewURL(*sk.FilePreview)
 	}
@@ -470,7 +446,6 @@ func mapSuratKeluarResponse(sk *models.SuratKeluar) dto.SuratKeluarResponse {
 		PreviewURL:       previewURL,
 		TotalPages:       0,
 		Pages:            nil,
-		IsArsip:          sk.IsArsip, // ← NEW
 		CreatedAt:        sk.CreatedAt,
 	}
 }

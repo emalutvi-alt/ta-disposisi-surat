@@ -12,6 +12,13 @@ type Log struct {
 	IDData       *int      `gorm:"column:id_data" json:"id_data,omitempty"`
 	ValuesOld    *string   `gorm:"column:values_old" json:"values_old,omitempty"`
 	ValuesNew    *string   `gorm:"column:values_new" json:"values_new,omitempty"`
+	Role         *string   `gorm:"column:role" json:"role,omitempty"`
+	Entity       *string   `gorm:"column:entity" json:"entity,omitempty"`
+	EntityID     *uint     `gorm:"column:entity_id" json:"entity_id,omitempty"`
+	OldStatus    *string   `gorm:"column:old_status" json:"old_status,omitempty"`
+	NewStatus    *string   `gorm:"column:new_status" json:"new_status,omitempty"`
+	IPAddress    *string   `gorm:"column:ip_address" json:"ip_address,omitempty"`
+	UserAgent    *string   `gorm:"column:user_agent" json:"user_agent,omitempty"`
 	UpdatedAt    time.Time `gorm:"column:updated_at" json:"updated_at"`
 
 	User *User `gorm:"foreignKey:UserID;references:ID" json:"user,omitempty"`

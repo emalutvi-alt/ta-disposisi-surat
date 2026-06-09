@@ -1,6 +1,8 @@
 package repositories
 
 import (
+	"time"
+
 	"github.com/fiorelln/disposisi/models"
 	"gorm.io/gorm"
 )
@@ -28,7 +30,20 @@ func (r *DistribusiSMRepository) MarkRead(disposisiID, userID uint, readAt inter
 	return r.db.Model(&models.DistribusiSM{}).
 		Where("id_disposisi = ? AND id_user = ?", disposisiID, userID).
 		Updates(map[string]interface{}{
-			"status":   "dibaca",
-			"read_at":  readAt,
+			"status":  "dibaca",
+			"read_at": readAt,
 		}).Error
+}
+
+func (r *DistribusiSMRepository) MarkRiwayatUserBySurat(suratMasukID, userID uint, readAt time.Time) (bool, error) {
+	result := r.db.Model(&models.DistribusiSM{}).
+		Where(`id_user = ? AND id_disposisi IN (
+			SELECT id_disposisi FROM disposisi WHERE id_surat_masuk = ?
+		)`, userID, suratMasukID).
+		Updates(map[string]interface{}{
+			"status":       "DITERIMA_USER",
+			"read_at":      readAt,
+			"riwayat_user": true,
+		})
+	return result.RowsAffected > 0, result.Error
 }

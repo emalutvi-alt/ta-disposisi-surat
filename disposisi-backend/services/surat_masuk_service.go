@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"mime/multipart"
+	"strings"
 	"time"
 
 	"github.com/fiorelln/disposisi/dto"
@@ -18,12 +19,12 @@ var ErrSuratNotFound = errors.New("surat tidak ditemukan")
 
 // SuratMasukService mengelola bisnis logic surat masuk.
 type SuratMasukService struct {
-	repo        *repositories.SuratMasukRepository
-	users       *repositories.UserRepository
-	logSvc      *LogService
-	notif       *NotificationService
+	repo         *repositories.SuratMasukRepository
+	users        *repositories.UserRepository
+	logSvc       *LogService
+	notif        *NotificationService
 	disposisiSvc *DisposisiService
-	pdfPreview  *PDFPreviewService // ← multi-page preview
+	pdfPreview   *PDFPreviewService // ← multi-page preview
 }
 
 // NewSuratMasukService membangun SuratMasukService dengan semua dependency-nya.
@@ -47,6 +48,9 @@ func NewSuratMasukService(
 
 // Create menyimpan surat masuk baru dan men-generate preview PDF multi-halaman.
 func (s *SuratMasukService) Create(actorID uint, input dto.CreateSuratMasukRequest, file *multipart.FileHeader) (*dto.SuratMasukResponse, error) {
+	if err := utils.ValidateNoSurat(input.NoSurat); err != nil {
+		return nil, err
+	}
 	tgl, err := time.Parse("2006-01-02", input.TanggalSurat)
 	if err != nil {
 		return nil, errors.New("format tanggal_surat harus YYYY-MM-DD")
@@ -60,17 +64,17 @@ func (s *SuratMasukService) Create(actorID uint, input dto.CreateSuratMasukReque
 
 	now := time.Now()
 	sm := &models.SuratMasuk{
-		NoSurat:         input.NoSurat,
-		PerihalSurat:    input.PerihalSurat,
-		AsalSurat:       input.AsalSurat,
-		TanggalSurat:    tgl,
-		FilePDF:         &saved.OriginalRel,
-		FilePreview:     nil, // akan diisi setelah generate preview
-		StatusVerifikasi: "menunggu",
-		StatusAlur:      "diterima_tu",
-		TanggalDiterima: &now,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		NoSurat:          input.NoSurat,
+		PerihalSurat:     input.PerihalSurat,
+		AsalSurat:        input.AsalSurat,
+		TanggalSurat:     tgl,
+		FilePDF:          &saved.OriginalRel,
+		FilePreview:      nil, // akan diisi setelah generate preview
+		StatusVerifikasi: utils.StatusMenungguPersetujuanKepsek,
+		StatusAlur:       utils.StatusMenungguPersetujuanKepsek,
+		TanggalDiterima:  &now,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 
 	if err := s.repo.Create(sm); err != nil {
@@ -97,16 +101,20 @@ func (s *SuratMasukService) Create(actorID uint, input dto.CreateSuratMasukReque
 	} else if !saved.IsPDF && saved.PreviewRel != "" {
 		// Untuk image biasa (jpg/png): simpan path preview langsung
 		sm.FilePreview = &saved.PreviewRel
+		if s.pdfPreview != nil {
+			_ = s.pdfPreview.SaveImagePreview(SuratMasukType, sm.ID, saved.PreviewRel)
+		}
 		_ = s.repo.Update(sm)
 	}
 
 	// Audit log
 	s.logSvc.WriteAuditLog(AuditLogInput{
-		UserID:   &actorID,
-		Action:   AuditCreateSuratMasuk,
-		Table:    "surat_masuk",
-		RecordID: &sm.ID,
-		NewValue: sm.NoSurat,
+		UserID:    &actorID,
+		Action:    AuditCreateSuratMasuk,
+		Table:     "surat_masuk",
+		RecordID:  &sm.ID,
+		NewValue:  sm.NoSurat,
+		NewStatus: sm.StatusAlur,
 	})
 
 	// Notifikasi ke kepsek
@@ -152,6 +160,9 @@ func (s *SuratMasukService) Update(actorID, id uint, input dto.UpdateSuratMasukR
 	}
 
 	if input.NoSurat != "" {
+		if err := utils.ValidateNoSurat(input.NoSurat); err != nil {
+			return nil, err
+		}
 		sm.NoSurat = input.NoSurat
 	}
 	if input.PerihalSurat != "" {
@@ -194,6 +205,9 @@ func (s *SuratMasukService) Update(actorID, id uint, input dto.UpdateSuratMasukR
 			}
 		} else if !saved.IsPDF && saved.PreviewRel != "" {
 			sm.FilePreview = &saved.PreviewRel
+			if s.pdfPreview != nil {
+				_ = s.pdfPreview.SaveImagePreview(SuratMasukType, sm.ID, saved.PreviewRel)
+			}
 		}
 	}
 
@@ -260,11 +274,14 @@ func (s *SuratMasukService) Verifikasi(id, userID uint, input dto.VerifikasiSura
 
 	oldStatus := sm.StatusVerifikasi
 	if input.IsApproved {
-		sm.StatusVerifikasi = "disetujui"
-		sm.StatusAlur = "diteruskan"
+		sm.StatusVerifikasi = utils.StatusDisetujuiKepsek
+		sm.StatusAlur = utils.StatusDisetujuiKepsek
 	} else {
-		sm.StatusVerifikasi = "ditolak"
-		sm.StatusAlur = "diterima_tu"
+		if input.Catatan == "" {
+			return nil, errors.New("Catatan Kepala Sekolah wajib diisi")
+		}
+		sm.StatusVerifikasi = utils.StatusDitolakKepsek
+		sm.StatusAlur = utils.StatusDitolakKepsek
 	}
 	sm.UpdatedAt = now
 
@@ -287,16 +304,171 @@ func (s *SuratMasukService) Verifikasi(id, userID uint, input dto.VerifikasiSura
 	}
 
 	s.logSvc.WriteAuditLog(AuditLogInput{
-		UserID:   &userID,
-		Action:   AuditVerifySuratMasuk,
-		Table:    "surat_masuk",
-		RecordID: &sm.ID,
-		OldValue: oldStatus,
-		NewValue: sm.StatusVerifikasi,
+		UserID:    &userID,
+		Action:    AuditVerifySuratMasuk,
+		Table:     "surat_masuk",
+		RecordID:  &sm.ID,
+		OldValue:  oldStatus,
+		NewValue:  sm.StatusVerifikasi,
+		OldStatus: oldStatus,
+		NewStatus: sm.StatusAlur,
 	})
 
 	s.notifyAdminsVerifikasi(userID, sm, input.IsApproved)
 
+	return s.buildResponseWithPages(sm)
+}
+
+func (s *SuratMasukService) KonfirmasiTU(actorID, id uint, input dto.KonfirmasiTUSuratMasukRequest) (*dto.SuratMasukResponse, error) {
+	sm, err := s.repo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrSuratNotFound
+		}
+		return nil, err
+	}
+
+	oldStatus := sm.StatusAlur
+	if sm.StatusVerifikasi == utils.StatusDitolakKepsek {
+		sm.StatusAlur = utils.StatusSelesai
+		sm.RiwayatTU = true
+	} else if sm.StatusVerifikasi == utils.StatusDisetujuiKepsek {
+		if len(input.WakaIDs) == 0 {
+			return nil, errors.New("Wakil Kepala Sekolah wajib dipilih")
+		}
+		for _, wakaID := range input.WakaIDs {
+			catatan := ""
+			if sm.CatatanVerifikasi != nil {
+				catatan = *sm.CatatanVerifikasi
+			}
+			if _, err := s.disposisiSvc.Create(actorID, dto.CreateDisposisiRequest{
+				SuratMasukID: sm.ID,
+				TujuanIDs:    []uint{wakaID},
+				Catatan:      catatan,
+			}); err != nil && !errors.Is(err, ErrDuplicatePenerima) {
+				return nil, err
+			}
+			p := actorID
+			_ = s.notif.Create(CreateNotificationInput{
+				PenerimaID:  wakaID,
+				PengirimID:  &p,
+				Type:        NotifTypeDisposisi,
+				Title:       "Surat masuk untuk Waka",
+				Message:     "Surat " + sm.NoSurat + " dikirim ke Wakil Kepala Sekolah",
+				ReferenceID: sm.ID,
+			})
+		}
+		sm.StatusAlur = utils.StatusDikirimKeWaka
+		sm.RiwayatTU = true
+	} else {
+		return nil, errors.New("surat belum dapat dikonfirmasi TU")
+	}
+
+	sm.UpdatedAt = time.Now()
+	if err := s.repo.Update(sm); err != nil {
+		return nil, err
+	}
+	s.logSvc.WriteAuditLog(AuditLogInput{
+		UserID: &actorID, Action: "konfirmasi_tu_surat_masuk", Table: "surat_masuk",
+		RecordID: &sm.ID, OldStatus: oldStatus, NewStatus: sm.StatusAlur,
+	})
+	return s.buildResponseWithPages(sm)
+}
+
+func (s *SuratMasukService) KirimKeUser(wakaID, id uint, input dto.KirimSuratMasukKeUserRequest) (*dto.SuratMasukResponse, error) {
+	if strings.TrimSpace(input.Catatan) == "" {
+		return nil, errors.New("Catatan Wakil Kepala Sekolah wajib diisi")
+	}
+	sm, err := s.repo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrSuratNotFound
+		}
+		return nil, err
+	}
+	if sm.StatusAlur != utils.StatusDikirimKeWaka {
+		return nil, errors.New("surat belum dikirim ke Waka")
+	}
+	wakaDisposisis, err := s.disposisiSvc.disposisi.FindBySuratMasukID(id)
+	if err != nil {
+		return nil, err
+	}
+	var disposisiID uint
+	for _, d := range wakaDisposisis {
+		if d.PenerimaID == wakaID {
+			disposisiID = d.ID
+			break
+		}
+	}
+	if disposisiID == 0 {
+		return nil, errors.New("akses surat ditolak")
+	}
+	now := time.Now()
+	for _, uid := range input.UserIDs {
+		if _, err := s.users.FindByID(uid); err != nil {
+			return nil, ErrInvalidTujuan
+		}
+		if err := s.disposisiSvc.distribusi.CreateBatch([]models.DistribusiSM{{
+			DisposisiID: disposisiID,
+			UserID:      &uid,
+			CreatedAt:   now,
+			Status:      utils.StatusDikirimKeUser,
+		}}); err != nil {
+			return nil, err
+		}
+		p := wakaID
+		_ = s.notif.Create(CreateNotificationInput{
+			PenerimaID:  uid,
+			PengirimID:  &p,
+			Type:        NotifTypeDisposisi,
+			Title:       "Surat masuk baru",
+			Message:     "Anda menerima surat " + sm.NoSurat,
+			ReferenceID: sm.ID,
+		})
+	}
+	oldStatus := sm.StatusAlur
+	sm.StatusAlur = utils.StatusDikirimKeUser
+	sm.UpdatedAt = now
+	if err := s.repo.Update(sm); err != nil {
+		return nil, err
+	}
+	if err := s.disposisiSvc.disposisi.MarkRiwayatWaka(id, wakaID); err != nil {
+		return nil, err
+	}
+	s.logSvc.WriteAuditLog(AuditLogInput{
+		UserID: &wakaID, Action: "waka_mengirim_surat_ke_penerima", Table: "surat_masuk",
+		RecordID: &sm.ID, OldStatus: oldStatus, NewStatus: sm.StatusAlur,
+	})
+	return s.buildResponseWithPages(sm)
+}
+
+func (s *SuratMasukService) KonfirmasiPenerimaan(userID, id uint) (*dto.SuratMasukResponse, error) {
+	sm, err := s.repo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrSuratNotFound
+		}
+		return nil, err
+	}
+	now := time.Now()
+	authorized, err := s.disposisiSvc.distribusi.MarkRiwayatUserBySurat(id, userID, now)
+	if err != nil {
+		return nil, err
+	}
+	if !authorized {
+		return nil, errors.New("akses surat ditolak")
+	}
+	oldStatus := sm.StatusAlur
+	sm.StatusAlur = utils.StatusSelesai
+	sm.StatusVerifikasi = utils.StatusDiterimaUser
+	sm.UpdatedAt = now
+	if err := s.repo.Update(sm); err != nil {
+		return nil, err
+	}
+	s.logSvc.WriteAuditLog(AuditLogInput{
+		UserID: &userID, Action: "user_konfirmasi_penerimaan", Table: "surat_masuk",
+		RecordID: &sm.ID, OldStatus: oldStatus, NewStatus: sm.StatusAlur,
+	})
 	return s.buildResponseWithPages(sm)
 }
 
@@ -350,9 +522,7 @@ func (s *SuratMasukService) buildResponseWithPages(sm *models.SuratMasuk) (*dto.
 func mapSuratMasukResponse(sm *models.SuratMasuk) dto.SuratMasukResponse {
 	fileURL := ""
 	previewURL := ""
-	if sm.FilePDF != nil {
-		fileURL = utils.BuildFileURL(*sm.FilePDF)
-	}
+	_ = fileURL
 	if sm.FilePreview != nil {
 		previewURL = utils.BuildPreviewURL(*sm.FilePreview)
 	}

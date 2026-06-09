@@ -76,13 +76,9 @@ func (h *AuthController) handleLoginError(c *gin.Context, err error, attemptedEm
 		// Jika email ada tapi password salah, error di password
 		emailExists, _ := h.auth.CheckEmailExists(attemptedEmail)
 		if !emailExists {
-			utils.ErrorBadRequest(c, "validasi gagal", map[string]string{
-				"email": "Email tidak terdaftar. Periksa kembali penulisan email Anda.",
-			})
+			utils.ErrorBadRequest(c, "Email tidak ditemukan", nil)
 		} else {
-			utils.ErrorBadRequest(c, "validasi gagal", map[string]string{
-				"password": "Kata sandi salah. Periksa kembali penulisan password Anda.",
-			})
+			utils.ErrorBadRequest(c, "Password salah", nil)
 		}
 
 	default:
@@ -266,7 +262,7 @@ func (h *AuthController) ResetPassword(c *gin.Context) {
 func (h *AuthController) Profile(c *gin.Context) {
 	userID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 
@@ -276,7 +272,7 @@ func (h *AuthController) Profile(c *gin.Context) {
 		return
 	}
 
-	utils.SuccessOK(c, "success", data)
+	utils.SuccessOK(c, "Data berhasil diambil", data)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -286,7 +282,7 @@ func (h *AuthController) Profile(c *gin.Context) {
 func (h *AuthController) ChangePassword(c *gin.Context) {
 	userID, err := utils.GetUserID(c)
 	if err != nil {
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 		return
 	}
 
@@ -366,7 +362,7 @@ func (h *AuthController) handleAuthError(c *gin.Context, err error) {
 func (h *AuthController) handleProtectedError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, services.ErrUserNotFound):
-		utils.ErrorUnauthorized(c, "unauthorized")
+		utils.ErrorUnauthorized(c, "Akses tidak sah")
 	default:
 		utils.ErrorInternal(c, "Terjadi kesalahan pada server")
 	}

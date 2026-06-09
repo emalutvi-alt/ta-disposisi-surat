@@ -56,7 +56,7 @@ func (s *UnifiedService) ProcessSuratMasukDisposisi(
 		return nil, err
 	}
 
-	if surat.StatusVerifikasi != "menunggu" {
+	if surat.StatusVerifikasi != utils.StatusMenungguPersetujuanKepsek {
 		return nil, errors.New("surat sudah diproses sebelumnya")
 	}
 
@@ -65,8 +65,8 @@ func (s *UnifiedService) ProcessSuratMasukDisposisi(
 
 	if req.Status == "disetujui" {
 		// Approve
-		surat.StatusVerifikasi = "disetujui"
-		surat.StatusAlur = "diteruskan"
+		surat.StatusVerifikasi = utils.StatusDisetujuiKepsek
+		surat.StatusAlur = utils.StatusDisetujuiKepsek
 		surat.UserVerifikasi = &kepsekID
 		surat.TanggalVerifikasi = &now
 		if catatan != "" {
@@ -83,7 +83,7 @@ func (s *UnifiedService) ProcessSuratMasukDisposisi(
 			if err != nil {
 				continue
 			}
-			
+
 			for _, uid := range userIDs {
 				// Cek duplicate
 				exists, _ := s.disposisiRepo.ExistsForSuratAndPenerima(idSuratMasuk, uid)
@@ -103,7 +103,7 @@ func (s *UnifiedService) ProcessSuratMasukDisposisi(
 					StatusDisposisi:      "belum_dibaca",
 					StatusApproval:       "disetujui",
 				}
-				
+
 				if err := s.disposisiRepo.CreateBatch([]models.Disposisi{disposisi}); err != nil {
 					continue
 				}
@@ -119,17 +119,19 @@ func (s *UnifiedService) ProcessSuratMasukDisposisi(
 		}
 
 		s.logSvc.WriteAuditLog(AuditLogInput{
-			UserID:   &kepsekID,
-			Action:   AuditVerifySuratMasuk,
-			Table:    "surat_masuk",
-			RecordID: &surat.ID,
-			OldValue: "menunggu",
-			NewValue: "disetujui",
+			UserID:    &kepsekID,
+			Action:    AuditVerifySuratMasuk,
+			Table:     "surat_masuk",
+			RecordID:  &surat.ID,
+			OldValue:  utils.StatusMenungguPersetujuanKepsek,
+			NewValue:  utils.StatusDisetujuiKepsek,
+			OldStatus: utils.StatusMenungguPersetujuanKepsek,
+			NewStatus: utils.StatusDisetujuiKepsek,
 		})
 
 		return &dto.UnifiedDisposisiResponse{
 			IDSurat:              idSuratMasuk,
-			Status:               "disetujui",
+			Status:               utils.StatusDisetujuiKepsek,
 			Catatan:              req.Catatan,
 			Tujuan:               req.Tujuan,
 			TanggapanSaran:       req.TanggapanSaran,
@@ -141,8 +143,11 @@ func (s *UnifiedService) ProcessSuratMasukDisposisi(
 
 	} else {
 		// Reject
-		surat.StatusVerifikasi = "ditolak"
-		surat.StatusAlur = "ditolak"
+		if catatan == "" {
+			return nil, errors.New("Catatan Kepala Sekolah wajib diisi")
+		}
+		surat.StatusVerifikasi = utils.StatusDitolakKepsek
+		surat.StatusAlur = utils.StatusDitolakKepsek
 		surat.UserVerifikasi = &kepsekID
 		surat.TanggalVerifikasi = &now
 		if catatan != "" {
@@ -167,17 +172,19 @@ func (s *UnifiedService) ProcessSuratMasukDisposisi(
 		}
 
 		s.logSvc.WriteAuditLog(AuditLogInput{
-			UserID:   &kepsekID,
-			Action:   AuditVerifySuratMasuk,
-			Table:    "surat_masuk",
-			RecordID: &surat.ID,
-			OldValue: "menunggu",
-			NewValue: "ditolak",
+			UserID:    &kepsekID,
+			Action:    AuditVerifySuratMasuk,
+			Table:     "surat_masuk",
+			RecordID:  &surat.ID,
+			OldValue:  utils.StatusMenungguPersetujuanKepsek,
+			NewValue:  utils.StatusDitolakKepsek,
+			OldStatus: utils.StatusMenungguPersetujuanKepsek,
+			NewStatus: utils.StatusDitolakKepsek,
 		})
 
 		return &dto.UnifiedDisposisiResponse{
 			IDSurat:          idSuratMasuk,
-			Status:           "ditolak",
+			Status:           utils.StatusDitolakKepsek,
 			Catatan:          req.Catatan,
 			TanggalDisposisi: now,
 		}, nil
@@ -198,7 +205,7 @@ func (s *UnifiedService) ProcessSuratKeluarVerifikasi(
 		return nil, err
 	}
 
-	if surat.StatusVerifikasi != "menunggu" {
+	if surat.StatusVerifikasi != utils.StatusMenungguPersetujuanKepsek {
 		return nil, errors.New("surat sudah diproses sebelumnya")
 	}
 
@@ -206,8 +213,8 @@ func (s *UnifiedService) ProcessSuratKeluarVerifikasi(
 	catatan := req.Catatan
 
 	if req.Status == "disetujui" {
-		surat.StatusVerifikasi = "disetujui"
-		surat.StatusAlur = "diteruskan"
+		surat.StatusVerifikasi = utils.StatusDisetujuiKepsek
+		surat.StatusAlur = utils.StatusDisetujuiKepsek
 		surat.UserVerifikasi = &kepsekID
 		surat.TanggalVerifikasi = &now
 		if catatan != "" {
@@ -225,7 +232,7 @@ func (s *UnifiedService) ProcessSuratKeluarVerifikasi(
 			if err != nil {
 				continue
 			}
-			
+
 			for _, uid := range userIDs {
 				distribusi := models.DistribusiSK{
 					SuratKeluarID: idSuratKeluar,
@@ -236,7 +243,7 @@ func (s *UnifiedService) ProcessSuratKeluarVerifikasi(
 				if err := distriRepo.CreateBatch([]models.DistribusiSK{distribusi}); err != nil {
 					continue
 				}
-				
+
 				_ = s.notifSvc.Create(CreateNotificationInput{
 					PenerimaID:  uid,
 					PengirimID:  &kepsekID,
@@ -249,25 +256,30 @@ func (s *UnifiedService) ProcessSuratKeluarVerifikasi(
 		}
 
 		s.logSvc.WriteAuditLog(AuditLogInput{
-			UserID:   &kepsekID,
-			Action:   AuditVerifySuratKeluar,
-			Table:    "surat_keluar",
-			RecordID: &surat.ID,
-			OldValue: "menunggu",
-			NewValue: "disetujui",
+			UserID:    &kepsekID,
+			Action:    AuditVerifySuratKeluar,
+			Table:     "surat_keluar",
+			RecordID:  &surat.ID,
+			OldValue:  utils.StatusMenungguPersetujuanKepsek,
+			NewValue:  utils.StatusDisetujuiKepsek,
+			OldStatus: utils.StatusMenungguPersetujuanKepsek,
+			NewStatus: utils.StatusDisetujuiKepsek,
 		})
 
 		return &dto.UnifiedDisposisiResponse{
 			IDSurat:          idSuratKeluar,
-			Status:           "disetujui",
+			Status:           utils.StatusDisetujuiKepsek,
 			Catatan:          req.Catatan,
 			Tujuan:           req.Tujuan,
 			TanggalDisposisi: now,
 		}, nil
 
 	} else {
-		surat.StatusVerifikasi = "ditolak"
-		surat.StatusAlur = "ditolak"
+		if catatan == "" {
+			return nil, errors.New("Catatan Kepala Sekolah wajib diisi")
+		}
+		surat.StatusVerifikasi = utils.StatusDitolakKepsek
+		surat.StatusAlur = utils.StatusDitolakKepsek
 		surat.UserVerifikasi = &kepsekID
 		surat.TanggalVerifikasi = &now
 		if catatan != "" {
@@ -292,17 +304,19 @@ func (s *UnifiedService) ProcessSuratKeluarVerifikasi(
 		}
 
 		s.logSvc.WriteAuditLog(AuditLogInput{
-			UserID:   &kepsekID,
-			Action:   AuditVerifySuratKeluar,
-			Table:    "surat_keluar",
-			RecordID: &surat.ID,
-			OldValue: "menunggu",
-			NewValue: "ditolak",
+			UserID:    &kepsekID,
+			Action:    AuditVerifySuratKeluar,
+			Table:     "surat_keluar",
+			RecordID:  &surat.ID,
+			OldValue:  utils.StatusMenungguPersetujuanKepsek,
+			NewValue:  utils.StatusDitolakKepsek,
+			OldStatus: utils.StatusMenungguPersetujuanKepsek,
+			NewStatus: utils.StatusDitolakKepsek,
 		})
 
 		return &dto.UnifiedDisposisiResponse{
 			IDSurat:          idSuratKeluar,
-			Status:           "ditolak",
+			Status:           utils.StatusDitolakKepsek,
 			Catatan:          req.Catatan,
 			TanggalDisposisi: now,
 		}, nil
@@ -319,7 +333,7 @@ func (s *UnifiedService) MarkSuratAsRead(
 
 	if jenis == "masuk" {
 		return s.db.Model(&models.DistribusiSM{}).
-			Where("id_user = ? AND id_disposisi IN (SELECT id_disposisi FROM disposisi WHERE id_surat_masuk = ?)", 
+			Where("id_user = ? AND id_disposisi IN (SELECT id_disposisi FROM disposisi WHERE id_surat_masuk = ?)",
 				userID, idSurat).
 			Updates(map[string]interface{}{
 				"status":  "dibaca",
